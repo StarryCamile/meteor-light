@@ -8,12 +8,15 @@ package meteordevelopment.meteorclient.systems.modules.render;
 import it.unimi.dsi.fastutil.ints.IntDoubleImmutablePair;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.events.game.ResolutionChangedEvent;
+import meteordevelopment.meteorclient.events.render.Render3DEvent;
 import meteordevelopment.meteorclient.events.render.RenderAfterWorldEvent;
 import meteordevelopment.meteorclient.gui.WidgetScreen;
 import meteordevelopment.meteorclient.renderer.*;
+import meteordevelopment.meteorclient.renderer.shader.ShaderManager;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
+import meteordevelopment.orbit.EventHandler;
 import meteordevelopment.orbit.listeners.ConsumerListener;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ChatScreen;
@@ -23,7 +26,7 @@ import net.minecraft.client.gui.screen.ingame.HandledScreen;
 public class Blur extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgScreens = settings.createGroup("Screens");
-
+    private final SettingGroup sgMotion = settings.createGroup("Motion");
     // Strength-Levels from https://github.com/jonaburg/picom/blob/a8445684fe18946604848efb73ace9457b29bf80/src/backend/backend_common.c#L372
     private final IntDoubleImmutablePair[] strengths = new IntDoubleImmutablePair[]{
         IntDoubleImmutablePair.of(1, 1.25), // LVL 1
@@ -47,6 +50,7 @@ public class Blur extends Module {
         IntDoubleImmutablePair.of(5, 7.25), // LVL 19
         IntDoubleImmutablePair.of(5, 8.5)   // LVL 20
     };
+    private ShaderManager SHADER = new ShaderManager();
 
     // General
     private final Setting<Integer> strength = sgGeneral.add(new IntSetting.Builder()
@@ -103,6 +107,24 @@ public class Blur extends Module {
     private boolean enabled;
     private long fadeEndAt;
 
+
+
+    private final Setting<Boolean> motionBlur = sgMotion.add(new BoolSetting.Builder()
+        .name("motion-blur")
+        .description("blur when motion")
+        .defaultValue(false)
+        .build()
+    );
+    private final Setting<Double> motionBlurAmount = sgGeneral.add(new DoubleSetting.Builder()
+        .name("Blur Amount")
+        .description(".")
+        .defaultValue(20)
+        .range(1, 100)
+        .sliderRange(1, 100)
+        .visible(motionBlur::get)
+        .build()
+    );
+
     public Blur() {
         super(Categories.Render, "blur", "Blurs background when in GUI screens.");
 
@@ -120,7 +142,10 @@ public class Blur extends Module {
 
         MeteorClient.EVENT_BUS.subscribe(new ConsumerListener<>(RenderAfterWorldEvent.class, event -> onRenderAfterWorld()));
     }
-
+    @EventHandler
+    private void onRender(Render3DEvent event) {
+        SHADER.renderMotionBlur(Math.min(motionBlurAmount.get().floatValue(), 99) / 100F);
+    }
     private void onRenderAfterWorld() {
         // Enable / disable with fading
         boolean shouldRender = shouldRender();
